@@ -73,12 +73,10 @@ jobs:
     - name: Install feeds
       run: |
         cd openwrt 
-        ./scripts/feeds install libpam libnetsnmp liblzma
-        ./scripts/feeds install -a
-        ./scripts/feeds update -a
         ./scripts/feeds install -a
         rm -rf feeds/packages/lang/golang
         git clone https://github.com/sbwml/packages_lang_golang -b 22.x feeds/packages/lang/golang
+        ./scripts/feeds install vsftpd openssh-sftp-server
         
     #- name: Add custom feeds and plugins
     #  run: |
