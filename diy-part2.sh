@@ -24,6 +24,7 @@ git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
 git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 git clone https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
+git clone https://github.com/sbwml/luci-app-alist package/alist
 
 # 设置默认 IP 地址为 10.10.10.1
 sed -i 's/192.168.1.1/10.10.10.1/g' package/base-files/files/bin/config_generate
