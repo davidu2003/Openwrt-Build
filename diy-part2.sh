@@ -17,7 +17,7 @@ rm -rf feeds/packages/lang/golang
 git clone https://github.com/sbwml/packages_lang_golang -b 23.x feeds/packages/lang/golang
 ./scripts/feeds install vsftpd openssh-sftp-server
 git clone --depth=1 https://github.com/pexcn/openwrt-chinadns-ng.git package/chinadns-ng
-git clone --depth=1 https://github.com/vernesong/OpenClash.git package/OpenClash
+git clone -b dev --depth=1 https://github.com/vernesong/OpenClash.git package/OpenClash
 git clone --depth=1 https://github.com/immortalwrt/homeproxy.git package/homeproxy
 rm -rf feeds/packages/net/v2ray-geodata
 git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
