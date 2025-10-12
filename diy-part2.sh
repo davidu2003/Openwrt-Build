@@ -14,7 +14,7 @@
 # DIY script part 2 (After feeds update and install)
 #安装自定义插件包
 rm -rf feeds/packages/lang/golang
-git clone https://github.com/sbwml/packages_lang_golang -b 23.x feeds/packages/lang/golang
+git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
 ./scripts/feeds install vsftpd openssh-sftp-server
 git clone --depth=1 https://github.com/pexcn/openwrt-chinadns-ng.git package/chinadns-ng
 git clone -b dev --depth=1 https://github.com/vernesong/OpenClash.git package/OpenClash
