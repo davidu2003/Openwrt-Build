@@ -31,6 +31,7 @@ sed -i 's/192.168.1.1/10.10.10.1/g' package/base-files/files/bin/config_generate
 
 # 修改rust编译配置
 sed -i 's|--set=llvm.download-ci-llvm=.*|--set=llvm.download-ci-llvm=false \\|' feeds/packages/lang/rust/Makefile
+grep "download-ci-llvm" -n feeds/packages/lang/rust/Makefile
 
 # 设置 root 文件系统分区大小为 1G
 sed -i 's/CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=16/g' .config
