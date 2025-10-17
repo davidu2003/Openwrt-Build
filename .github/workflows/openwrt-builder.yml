@@ -79,13 +79,7 @@ jobs:
       run: |
         echo "🦀 Using prebuilt Rust toolchain..."
         echo "export RUST_HOST_TOOLCHAIN=1" >> $GITHUB_ENV
-
-        echo "💾 Adding 8G swap to prevent OOM..."
-        sudo fallocate -l 8G /swapfile
-        sudo chmod 600 /swapfile
-        sudo mkswap /swapfile
-        sudo swapon /swapfile
-        free -h
+        
     
     #- name: Add custom feeds and plugins
     #  run: |
