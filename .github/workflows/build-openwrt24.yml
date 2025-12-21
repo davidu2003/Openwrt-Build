@@ -59,7 +59,8 @@ jobs:
         root-reserve-mb: 1024
 
     - name: Checkout
-      uses: actions/checkout@ma
+      uses: actions/checkout@main
+      
     # === 新增：预安装 Go 环境 ===
     - name: Setup Go Environment
       uses: actions/setup-go@v5
