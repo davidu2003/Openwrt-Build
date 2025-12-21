@@ -147,6 +147,10 @@ jobs:
         echo "CONFIG_NET_SCH_FQ=y" >> .config
         echo "CONFIG_kmod-tcp-bbr=y" >> .config
         echo "CONFIG_kmod-sched-fq=y" >> .config
+        
+        # === 修复 MosDNS 编译错误 ===
+        # 关闭 UPX 压缩 (CI 环境容易失败，且对软路由性能无影响)
+        echo "CONFIG_MOSDNS_COMPRESS_UPX=n" >> .config
 
         # 生成完整配置
         make defconfig
@@ -163,7 +167,13 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
+        # 1. 单独编译 MosDNS (使用单线程 -j1 防止内存溢出)
+        # 如果这一步失败，脚本会打印详细日志 (V=s) 并退出，方便你排查
+        make package/mosdns/compile -j1 V=s || exit 1
+        
+        # 2. 编译其余固件 (恢复多线程)
         make -j$(nproc) || make -j1 || make -j1 V=s
+        
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Organize Files
