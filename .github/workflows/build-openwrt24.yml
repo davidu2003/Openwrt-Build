@@ -171,19 +171,25 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        # === 阶段 1: 编译基础工具链 (修复 ld-musl 缺失报错) ===
-        # 先编译宿主工具和交叉编译器，确保底层库文件存在
+        
+        # === 阶段 1: 编译基础工具链 (确保地基稳固) ===
         echo "Building Tools and Toolchain..."
         make tools/install -j$(nproc) || make tools/install -j1
         make toolchain/install -j$(nproc) || make toolchain/install -j1
         
-        # === 阶段 2: 单独编译易出错/耗内存的插件 ===
-        # 此时工具链已准备好，再编译 MosDNS 就不会报错了
+        # === 阶段 2: 优先编译耗时巨大的库 (OpenSSL) ===
+        # ⚠️ 关键点：OpenSSL 必须用多线程跑，否则会卡很久
+        echo "Building OpenSSL (Heavy task)..."
+        make package/libs/openssl/compile -j$(nproc) || make package/libs/openssl/compile -j1 V=s
+        
+        # === 阶段 3: 单独编译易出错的插件 (MosDNS) ===
         echo "Building MosDNS..."
+        # 注意：MosDNS 我们之前说过要用单线程防止内存溢出
         make package/mosdns/compile -j1 V=s || exit 1
         
-        # === 阶段 3: 编译剩余所有固件 ===
-        echo "Building Firmware..."
+        # === 阶段 4: 编译剩余所有固件 ===
+        echo "Building Firmware (Remaining)..."
+        # 此时最难啃的骨头(OpenSSL)和最易碎的骨头(MosDNS)都啃完了，剩下的可以全速跑
         make -j$(nproc) || make -j1 || make -j1 V=s
         
         echo "status=success" >> $GITHUB_OUTPUT
