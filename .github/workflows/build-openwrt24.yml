@@ -36,7 +36,7 @@ jobs:
         echo "--------------------------硬盘信息--------------------------"
         echo "硬盘数量: $(ls /dev/sd* | grep -v [1-9] | wc -l)" && df -hT
 
-    - name: Initialization Environment
+        - name: Initialization Environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
@@ -47,13 +47,11 @@ jobs:
         sudo -E apt-get -y install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
         sudo -E apt-get -y autoremove --purge
         sudo -E apt-get clean
-        df -hT
         sudo timedatectl set-timezone "$TZ"
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
+        # ❌ 删除下面这几行创建 workdir 的代码，我们不需要它
+        # sudo mkdir -p /workdir
+        # sudo chown $USER:$GROUPS /workdir
 
-    # === 修正 1: 将 Go 安装移到“切盘”之前 ===
-    # 这样 Go 安装占用的空间就算在系统盘里，不会导致切盘后溢出
     - name: Setup Go Environment
       uses: actions/setup-go@v5
       with:
@@ -66,33 +64,32 @@ jobs:
         echo "GOPROXY=https://proxy.golang.org,direct" >> $GITHUB_ENV
         echo "GOPRIVATE=" >> $GITHUB_ENV
 
-    # === 修正 2: 增加 root-reserve-mb 到 4GB (4096) ===
     - name: Combine Disks
       uses: easimon/maximize-build-space@master
       with:
         swap-size-mb: 1024
         temp-reserve-mb: 100
-        root-reserve-mb: 4096 
+        root-reserve-mb: 2048 # 建议稍微给大一点点，防爆
 
     - name: Checkout
       uses: actions/checkout@main
-        
+
     - name: Clone Source Code
-      working-directory: /workdir
+      # ❌ 删除 working-directory: /workdir
       run: |
+        # 此时当前目录已经是扩容后的大分区了
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
-        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
-    
-    # === 插入位置：Clone Source Code 之后，Update Feeds 之前 ===
+        # ❌ 删除软链接操作，因为我们已经在正确的地方了
+
+    # === 缓存配置 ===
     - name: Cache Toolchain
       if: env.CACHE_TOOLCHAIN == 'true'
       uses: HiGarfield/cachewrtbuild@main
       with:
         ccache: false
-        # mixkey 是缓存的唯一指纹
-        # 只要 分支(v24.10.5) 和 架构(x86_64) 不变，就能命中缓存
         mixkey: ${{ env.REPO_BRANCH }}-x86_64
+        # 注意：这里 prefix 改为当前目录下的 openwrt
         prefix: ${{ github.workspace }}/openwrt
 
     - name: Update Feeds & Add Custom Sources
