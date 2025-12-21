@@ -1,0 +1,175 @@
+name: Build OpenWrt 24.10
+
+on:
+  workflow_dispatch:
+    inputs:
+      ssh:
+        description: 'SSH connection to Actions'
+        required: false
+        default: 'false'
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt
+  REPO_BRANCH: openwrt-24.10
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: .config
+  TZ: Asia/Shanghai
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Initialization Environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        docker rmi `docker images -q`
+        sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /usr/local/lib/android
+        sudo -E apt-get -y purge azure-cli ghc* zulu* hhvm llvm* firefox google-chrome-stable microsoft-edge-stable dotnet* powershell openjdk* mysql* php*
+        sudo -E apt-get -y update
+        sudo -E apt-get -y install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+        sudo -E apt-get -y autoremove --purge
+        sudo -E apt-get clean
+        sudo timedatectl set-timezone "$TZ"
+        mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
+
+    - name: Clone Source Code
+      working-directory: /workdir
+      run: |
+        df -hT $PWD
+        git clone $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: Update Feeds & Add Custom Sources
+      run: |
+        cd openwrt
+        # 替换 Golang
+        rm -rf feeds/packages/lang/golang
+        git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
+        
+        # 更新默认源
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: Install Custom Packages (DIY Script)
+      run: |
+        cd openwrt
+        # --- 下载插件 ---
+        git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
+        git clone https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
+        git clone -b dev --depth=1 https://github.com/vernesong/OpenClash.git package/openclash
+        
+        rm -rf feeds/packages/net/v2ray-geodata
+        git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
+        git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
+        
+        git clone https://github.com/pexcn/openwrt-chinadns-ng.git package/chinadns-ng
+        git clone https://github.com/immortalwrt/homeproxy.git package/homeproxy
+
+        # --- 修改配置 ---
+        # 修改 LAN IP
+        sed -i 's/192.168.1.1/10.10.10.1/g' package/base-files/files/bin/config_generate
+        # 修改默认主题
+        sed -i 's/luci.main.mediaurlbase=.*/luci.main.mediaurlbase=\/luci-static\/argon/g' feeds/luci/modules/luci-base/root/etc/config/luci
+        # 修复 Rust 编译
+        if [ -f "feeds/packages/lang/rust/Makefile" ]; then
+            sed -i 's|--set=llvm.download-ci-llvm=.*|--set=llvm.download-ci-llvm=false \\|' feeds/packages/lang/rust/Makefile
+        fi
+
+    - name: Generate Config File
+      run: |
+        cd openwrt
+        rm -f .config
+        
+        # --- 1. 目标平台设置 (X86_64) ---
+        # 如果你是 ARM 平台，请修改这里
+        echo "CONFIG_TARGET_x86=y" >> .config
+        echo "CONFIG_TARGET_x86_64=y" >> .config
+        echo "CONFIG_TARGET_x86_64_DEVICE_generic=y" >> .config
+
+        # --- 2. 核心设置 ---
+        echo "CONFIG_TARGET_ROOTFS_PARTSIZE=10240" >> .config
+        echo "CONFIG_PACKAGE_blockd=y" >> .config
+        echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
+        echo "CONFIG_PACKAGE_luci-ssl-openssl=y" >> .config
+        echo "CONFIG_PACKAGE_luci=y" >> .config
+        echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
+
+        # --- 3. 插件设置 ---
+        echo "CONFIG_PACKAGE_luci-theme-argon=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-argon-config=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-mosdns=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-upnp=y" >> .config
+        echo "CONFIG_PACKAGE_luci-app-statistics=y" >> .config
+        echo "CONFIG_PACKAGE_chinadns-ng=y" >> .config
+        echo "CONFIG_PACKAGE_homeproxy=y" >> .config
+
+        # --- 4. 工具设置 ---
+        echo "CONFIG_PACKAGE_tcpdump=y" >> .config
+        echo "CONFIG_PACKAGE_vim-full=y" >> .config
+        echo "CONFIG_PACKAGE_bash=y" >> .config
+        echo "CONFIG_PACKAGE_zsh=y" >> .config
+        echo "CONFIG_PACKAGE_fdisk=y" >> .config
+        echo "CONFIG_PACKAGE_resize2fs=y" >> .config
+        
+        # --- 5. Collectd 模块 ---
+        echo "CONFIG_PACKAGE_collectd=y" >> .config
+        echo "CONFIG_PACKAGE_collectd-mod-cpu=y" >> .config
+        echo "CONFIG_PACKAGE_collectd-mod-cpufreq=y" >> .config
+        echo "CONFIG_PACKAGE_collectd-mod-interface=y" >> .config
+        echo "CONFIG_PACKAGE_collectd-mod-load=y" >> .config
+        echo "CONFIG_PACKAGE_collectd-mod-memory=y" >> .config
+        echo "CONFIG_PACKAGE_collectd-mod-network=y" >> .config
+        echo "CONFIG_PACKAGE_collectd-mod-sensors=y" >> .config
+
+        # --- 6. ⚠️ 关键：BBR 和 FQ 内核配置 ---
+        # 强制开启内核中的 FQ 和 BBR
+        echo "CONFIG_NET_SCH_FQ=y" >> .config
+        echo "CONFIG_kmod-tcp-bbr=y" >> .config
+        echo "CONFIG_kmod-sched-fq=y" >> .config
+
+        # 生成完整配置
+        make defconfig
+
+    - name: Download Sources
+      run: |
+        cd openwrt
+        make download -j8
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+
+    - name: Compile Firmware
+      id: compile
+      run: |
+        cd openwrt
+        echo -e "$(nproc) thread compile"
+        make -j$(nproc) || make -j1 || make -j1 V=s
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Organize Files
+      id: organize
+      if: steps.compile.outputs.status == 'success'
+      run: |
+        cd openwrt/bin/targets/*/*
+        rm -rf packages
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload Firmware Directory
+      uses: actions/upload-artifact@v4
+      if: steps.organize.outputs.status == 'success'
+      with:
+        name: OpenWrt_firmware
+        path: ${{ env.FIRMWARE }}
+
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@v2
+      with:
+        retain_days: 1
+        keep_minimum_runs: 3
