@@ -82,6 +82,17 @@ jobs:
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
     
+    # === 插入位置：Clone Source Code 之后，Update Feeds 之前 ===
+    - name: Cache Toolchain
+      if: env.CACHE_TOOLCHAIN == 'true'
+      uses: HiGarfield/cachewrtbuild@main
+      with:
+        ccache: false
+        # mixkey 是缓存的唯一指纹
+        # 只要 分支(v24.10.5) 和 架构(x86_64) 不变，就能命中缓存
+        mixkey: ${{ env.REPO_BRANCH }}-x86_64
+        prefix: ${{ github.workspace }}/openwrt
+
     - name: Update Feeds & Add Custom Sources
       run: |
         cd openwrt
@@ -198,11 +209,6 @@ jobs:
         echo "Building Tools and Toolchain..."
         make tools/install -j$(nproc) || make tools/install -j1
         make toolchain/install -j$(nproc) || make toolchain/install -j1
-        
-        # === 阶段 2: 优先编译耗时巨大的库 (OpenSSL) ===
-        # ⚠️ 关键点：OpenSSL 必须用多线程跑，否则会卡很久
-        echo "Building OpenSSL (Heavy task)..."
-        make package/libs/openssl/compile -j$(nproc) || make package/libs/openssl/compile -j1 V=s
         
         # === 阶段 3: 单独编译易出错的插件 (MosDNS) ===
         echo "Building MosDNS..."
