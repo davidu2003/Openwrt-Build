@@ -192,7 +192,26 @@ jobs:
       with:
         name: OpenWrt_firmware
         path: ${{ env.FIRMWARE }}
+    - name: Generate release tag
+      id: tag
+      if: steps.organize.outputs.status == 'success' && !cancelled()
+      run: |
+        # 生成一个基于时间的标签，例如 v24.10.5-20251221
+        echo "release_tag=v24.10.5-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        touch release.txt
+        echo "OpenWrt v24.10.5 自编译固件" >> release.txt
+        echo "编译时间: $(date)" >> release.txt
 
+    - name: Upload Firmware to Release
+      uses: softprops/action-gh-release@v1
+      if: steps.organize.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        body_path: release.txt
+        files: ${{ env.FIRMWARE }}/*
+        
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@v2
       with:
