@@ -63,12 +63,15 @@ jobs:
       run: |
         cd openwrt
         
-        # 替换 Golang
-        rm -rf feeds/packages/lang/golang
-        git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
-
-        # 更新默认源
+        # 1. ⚠️ 必须先运行 update，确保基础 feeds 目录已存在且是最新的
         ./scripts/feeds update -a
+        
+        # 2. Update 之后，再强行替换 Golang 为 25.x 分支
+        echo "Replacing Golang with 25.x branch..."
+        rm -rf feeds/packages/lang/golang
+        git clone https://github.com/sbwml/packages_lang_golang -b 25.x feeds/packages/lang/golang
+        
+        # 3. 最后安装所有包的链接
         ./scripts/feeds install -a
 
     - name: Install Custom Packages (DIY Script)
