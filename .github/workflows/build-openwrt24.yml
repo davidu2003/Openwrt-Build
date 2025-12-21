@@ -42,7 +42,7 @@ jobs:
     - name: Setup Go Environment
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23' 
+        go-version: '1.25' 
         check-latest: true
         cache: true
     
@@ -65,7 +65,7 @@ jobs:
         
         # 替换 Golang
         rm -rf feeds/packages/lang/golang
-        git clone https://github.com/sbwml/packages_lang_golang -b 25.x feeds/packages/lang/golang
+        git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
 
         # 更新默认源
         ./scripts/feeds update -a
