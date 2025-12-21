@@ -64,13 +64,6 @@ jobs:
         echo "GOPROXY=https://proxy.golang.org,direct" >> $GITHUB_ENV
         echo "GOPRIVATE=" >> $GITHUB_ENV
 
-    - name: Combine Disks
-      uses: easimon/maximize-build-space@master
-      with:
-        swap-size-mb: 1024
-        temp-reserve-mb: 100
-        root-reserve-mb: 2048 # 建议稍微给大一点点，防爆
-
     - name: Checkout
       uses: actions/checkout@main
 
@@ -78,7 +71,7 @@ jobs:
       # ❌ 删除 working-directory: /workdir
       run: |
         # 此时当前目录已经是扩容后的大分区了
-        df -hT $PWD
+        df -hT
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         # ❌ 删除软链接操作，因为我们已经在正确的地方了
 
@@ -203,16 +196,6 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        
-        # === 阶段 1: 编译基础工具链 (确保地基稳固) ===
-        echo "Building Tools and Toolchain..."
-        make tools/install -j$(nproc) || make tools/install -j1
-        make toolchain/install -j$(nproc) || make toolchain/install -j1
-        
-        # === 阶段 3: 单独编译易出错的插件 (MosDNS) ===
-        echo "Building MosDNS..."
-        # 注意：MosDNS 我们之前说过要用单线程防止内存溢出
-        make package/mosdns/compile -j1 V=s || exit 1
         
         # === 阶段 4: 编译剩余所有固件 ===
         echo "Building Firmware (Remaining)..."
