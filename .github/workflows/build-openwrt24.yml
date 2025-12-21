@@ -40,10 +40,8 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        docker system prune -a -f
-
+        docker rmi `docker images -q`
         sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /usr/local/lib/android
-        # 修正点：删除了 hhvm，并在末尾添加了 "|| true" 防止因找不到包而报错退出
         sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google-chrome-stable microsoft-edge-stable dotnet* powershell openjdk* mysql* php* || true
         sudo -E apt-get -y update
         sudo -E apt-get -y install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
@@ -53,17 +51,9 @@ jobs:
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
-    - name: Combine Disks
-      uses: easimon/maximize-build-space@master
-      with:
-        swap-size-mb: 1024
-        temp-reserve-mb: 100
-        root-reserve-mb: 1024
 
-    - name: Checkout
-      uses: actions/checkout@main
-      
-    # === 新增：预安装 Go 环境 ===
+    # === 修正 1: 将 Go 安装移到“切盘”之前 ===
+    # 这样 Go 安装占用的空间就算在系统盘里，不会导致切盘后溢出
     - name: Setup Go Environment
       uses: actions/setup-go@v5
       with:
@@ -71,11 +61,21 @@ jobs:
         check-latest: true
         cache: true
     
-    # === 新增：设置 Go 代理与环境变量 ===
     - name: Set Go Proxy
       run: |
         echo "GOPROXY=https://proxy.golang.org,direct" >> $GITHUB_ENV
         echo "GOPRIVATE=" >> $GITHUB_ENV
+
+    # === 修正 2: 增加 root-reserve-mb 到 4GB (4096) ===
+    - name: Combine Disks
+      uses: easimon/maximize-build-space@master
+      with:
+        swap-size-mb: 1024
+        temp-reserve-mb: 100
+        root-reserve-mb: 4096 
+
+    - name: Checkout
+      uses: actions/checkout@main
         
     - name: Clone Source Code
       working-directory: /workdir
