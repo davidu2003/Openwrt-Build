@@ -168,11 +168,19 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        # 1. 单独编译 MosDNS (使用单线程 -j1 防止内存溢出)
-        # 如果这一步失败，脚本会打印详细日志 (V=s) 并退出，方便你排查
+        # === 阶段 1: 编译基础工具链 (修复 ld-musl 缺失报错) ===
+        # 先编译宿主工具和交叉编译器，确保底层库文件存在
+        echo "Building Tools and Toolchain..."
+        make tools/install -j$(nproc) || make tools/install -j1
+        make toolchain/install -j$(nproc) || make toolchain/install -j1
+        
+        # === 阶段 2: 单独编译易出错/耗内存的插件 ===
+        # 此时工具链已准备好，再编译 MosDNS 就不会报错了
+        echo "Building MosDNS..."
         make package/mosdns/compile -j1 V=s || exit 1
         
-        # 2. 编译其余固件 (恢复多线程)
+        # === 阶段 3: 编译剩余所有固件 ===
+        echo "Building Firmware..."
         make -j$(nproc) || make -j1 || make -j1 V=s
         
         echo "status=success" >> $GITHUB_OUTPUT
