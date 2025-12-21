@@ -62,13 +62,14 @@ jobs:
     - name: Update Feeds & Add Custom Sources
       run: |
         cd openwrt
-        # 替换 Golang
-        rm -rf feeds/packages/lang/golang
-        git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
         
         # 更新默认源
         ./scripts/feeds update -a
         ./scripts/feeds install -a
+
+        # 替换 Golang
+        rm -rf feeds/packages/lang/golang
+        git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
 
     - name: Install Custom Packages (DIY Script)
       run: |
