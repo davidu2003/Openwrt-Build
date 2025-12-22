@@ -186,6 +186,12 @@ jobs:
 
         make defconfig
 
+    - name: Upload Config File
+      uses: actions/upload-artifact@v4
+      with:
+        name: OpenWrt_Config_Debug
+        path: openwrt/.config
+    
     - name: Download Sources
       run: |
         cd openwrt
