@@ -149,7 +149,7 @@ jobs:
         echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
         echo "CONFIG_PACKAGE_luci=y" >> .config
         echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
-        echo "CONFIG_LUCI_SRCDIET=n" >> .config
+        # echo "CONFIG_LUCI_SRCDIET=n" >> .config
 
         # --- 插件 ---
         echo "CONFIG_PACKAGE_luci-theme-argon=y" >> .config
