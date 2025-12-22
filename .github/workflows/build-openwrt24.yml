@@ -203,7 +203,13 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
+        
+        # 尝试多线程编译
+        make -j$(nproc) || {
+          echo "多线程编译失败，尝试单线程输出错误信息..."
+          make -j1 V=s
+        }
+        
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Organize Files
