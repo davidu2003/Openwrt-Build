@@ -194,6 +194,11 @@ jobs:
     - name: Clear DL Package
       run: |
         rm -rf openwrt/dl/*
+        # 显示最新的空间情况
+        echo "======================="
+        echo "Space availability:"
+        df -hT
+        echo "======================="
         
     - name: Compile Firmware
       id: compile
