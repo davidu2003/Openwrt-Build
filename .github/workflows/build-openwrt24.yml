@@ -43,7 +43,8 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        # 只需要安装依赖即可，清理工作交给上面的 Action 完成了
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
         sudo -E apt-get -y update
         sudo -E apt-get -y install $(curl -fsSL https://is.gd/depend_ubuntu2204_openwrt)
         sudo -E systemctl daemon-reload
