@@ -21,37 +21,48 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: Check Server Performance
-      run: |
-        echo "警告⚠"
-        echo "分配的服务器性能有限，若选择的插件过多，务必注意CPU性能！"
-        echo -e "已知CPU型号(降序): 7763，8370C，8272CL，8171M，E5-2673\n"
-        echo "--------------------------CPU信息--------------------------"
-        echo "CPU物理数量: $(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)"
-        echo "CPU核心数量: $(nproc)"
-        echo -e "CPU型号信息:$(cat /proc/cpuinfo | grep -m1 name | awk -F: '{print $2}')\n"
-        echo "--------------------------内存信息--------------------------"
-        echo "已安装内存详细信息:"
-        echo -e "$(sudo lshw -short -C memory | grep GiB)\n"
-        echo "--------------------------硬盘信息--------------------------"
-        echo "硬盘数量: $(ls /dev/sd* | grep -v [1-9] | wc -l)" && df -hT
+    - name: Checkout
+      uses: actions/checkout@main
 
+    # ✅ 【新增优化】使用专用 Action 深度清理磁盘
+    # 这步会替代你原来的 "Initialization Environment" 中的部分清理代码
+    # 能释放约 30GB+ 空间，总可用空间将达到 60GB+
+    - name: Free Disk Space (Ubuntu)
+      uses: jlumbroso/free-disk-space@main
+      with:
+        # 删除所有不需要的预装软件
+        tool-cache: true
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true # ⚠ 关键：删除 Swap 分区可释放 7GB
+    
     - name: Initialization Environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-        sudo docker image prune --all --force
+        # 只需要安装依赖即可，清理工作交给上面的 Action 完成了
         sudo -E apt-get -y update
-        sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
         sudo -E apt-get -y install $(curl -fsSL https://is.gd/depend_ubuntu2204_openwrt)
         sudo -E systemctl daemon-reload
         sudo -E apt-get -y autoremove --purge
         sudo -E apt-get clean
         sudo timedatectl set-timezone "$TZ"
-        # ❌ 删除下面这几行创建 workdir 的代码，我们不需要它
-        # sudo mkdir -p /workdir
-        # sudo chown $USER:$GROUPS /workdir
+        
+        # 显示清理后的空间情况
+        echo "======================="
+        echo "Space availability:"
+        df -hT
+        echo "======================="
+
+    - name: Check Server Performance
+      run: |
+        echo "警告⚠"
+        echo "分配的服务器性能有限，若选择的插件过多，务必注意CPU性能！"
+        echo "--------------------------硬盘信息--------------------------"
+        df -hT
 
     - name: Setup Go Environment
       uses: actions/setup-go@v5
@@ -65,16 +76,10 @@ jobs:
         echo "GOPROXY=https://proxy.golang.org,direct" >> $GITHUB_ENV
         echo "GOPRIVATE=" >> $GITHUB_ENV
 
-    - name: Checkout
-      uses: actions/checkout@main
-
     - name: Clone Source Code
-      # ❌ 删除 working-directory: /workdir
       run: |
-        # 此时当前目录已经是扩容后的大分区了
-        df -hT
-        git clone $REPO_URL -b $REPO_BRANCH openwrt
-        # ❌ 删除软链接操作，因为我们已经在正确的地方了
+        # ✅ 优化：加上 --depth 1 减少 git 历史占用
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
 
     # === 缓存配置 ===
     - name: Cache Toolchain
@@ -83,45 +88,39 @@ jobs:
       with:
         ccache: false
         mixkey: ${{ env.REPO_BRANCH }}-x86_64
-        # 注意：这里 prefix 改为当前目录下的 openwrt
         prefix: ${{ github.workspace }}/openwrt
 
     - name: Update Feeds & Add Custom Sources
       run: |
         cd openwrt
         
-        # 1. ⚠️ 必须先运行 update，确保基础 feeds 目录已存在且是最新的
         ./scripts/feeds update -a
         
-        # 2. Update 之后，再强行替换 Golang 为 25.x 分支
         echo "Replacing Golang with 25.x branch..."
         rm -rf feeds/packages/lang/golang
-        git clone https://github.com/sbwml/packages_lang_golang -b 25.x feeds/packages/lang/golang
+        # ✅ 优化：加上 --depth 1
+        git clone https://github.com/sbwml/packages_lang_golang -b 25.x --depth 1 feeds/packages/lang/golang
         
-        # 3. 最后安装所有包的链接
         ./scripts/feeds install -a
 
     - name: Install Custom Packages (DIY Script)
       run: |
         cd openwrt
-        # --- 下载插件 ---
-        git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
-        git clone https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
-        git clone -b dev --depth=1 https://github.com/vernesong/OpenClash.git package/openclash
+        # ✅ 优化：所有 git clone 都加上 --depth 1
+        git clone --depth 1 https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
+        git clone --depth 1 https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
+        git clone --depth 1 -b dev https://github.com/vernesong/OpenClash.git package/openclash
         
         rm -rf feeds/packages/net/v2ray-geodata
-        git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
-        git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
+        git clone --depth 1 https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
+        git clone --depth 1 https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
         
-        git clone https://github.com/pexcn/openwrt-chinadns-ng.git package/chinadns-ng
-        git clone https://github.com/immortalwrt/homeproxy.git package/homeproxy
+        git clone --depth 1 https://github.com/pexcn/openwrt-chinadns-ng.git package/chinadns-ng
+        git clone --depth 1 https://github.com/immortalwrt/homeproxy.git package/homeproxy
 
         # --- 修改配置 ---
-        # 修改 LAN IP
         sed -i 's/192.168.1.1/10.10.10.1/g' package/base-files/files/bin/config_generate
-        # 修改默认主题
         sed -i 's/luci.main.mediaurlbase=.*/luci.main.mediaurlbase=\/luci-static\/argon/g' feeds/luci/modules/luci-base/root/etc/config/luci
-        # 修复 Rust 编译
         if [ -f "feeds/packages/lang/rust/Makefile" ]; then
             sed -i 's|--set=llvm.download-ci-llvm=.*|--set=llvm.download-ci-llvm=false \\|' feeds/packages/lang/rust/Makefile
         fi
@@ -131,20 +130,19 @@ jobs:
         cd openwrt
         rm -f .config
         
-        # --- 1. 目标平台设置 (X86_64) ---
-        # 如果你是 ARM 平台，请修改这里
+        # --- 目标平台 ---
         echo "CONFIG_TARGET_x86=y" >> .config
         echo "CONFIG_TARGET_x86_64=y" >> .config
         echo "CONFIG_TARGET_x86_64_DEVICE_generic=y" >> .config
 
-        # --- 2. 核心设置 ---
+        # --- 核心设置 ---
         echo "CONFIG_TARGET_ROOTFS_PARTSIZE=10240" >> .config
         echo "CONFIG_PACKAGE_blockd=y" >> .config
         echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
         echo "CONFIG_PACKAGE_luci=y" >> .config
         echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
 
-        # --- 3. 插件设置 ---
+        # --- 插件 ---
         echo "CONFIG_PACKAGE_luci-theme-argon=y" >> .config
         echo "CONFIG_PACKAGE_luci-app-argon-config=y" >> .config
         echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
@@ -154,7 +152,7 @@ jobs:
         echo "CONFIG_PACKAGE_chinadns-ng=y" >> .config
         echo "CONFIG_PACKAGE_homeproxy=y" >> .config
 
-        # --- 4. 工具设置 ---
+        # --- 工具 ---
         echo "CONFIG_PACKAGE_tcpdump=y" >> .config
         echo "CONFIG_PACKAGE_vim-full=y" >> .config
         echo "CONFIG_PACKAGE_bash=y" >> .config
@@ -162,7 +160,7 @@ jobs:
         echo "CONFIG_PACKAGE_fdisk=y" >> .config
         echo "CONFIG_PACKAGE_resize2fs=y" >> .config
         
-        # --- 5. Collectd 模块 ---
+        # --- Collectd ---
         echo "CONFIG_PACKAGE_collectd=y" >> .config
         echo "CONFIG_PACKAGE_collectd-mod-cpu=y" >> .config
         echo "CONFIG_PACKAGE_collectd-mod-cpufreq=y" >> .config
@@ -172,17 +170,12 @@ jobs:
         echo "CONFIG_PACKAGE_collectd-mod-network=y" >> .config
         echo "CONFIG_PACKAGE_collectd-mod-sensors=y" >> .config
 
-        # --- 6. ⚠️ 关键：BBR 和 FQ 内核配置 ---
-        # 强制开启内核中的 FQ 和 BBR
+        # --- Kernel ---
         echo "CONFIG_NET_SCH_FQ=y" >> .config
         echo "CONFIG_kmod-tcp-bbr=y" >> .config
         echo "CONFIG_kmod-sched-fq=y" >> .config
-        
-        # === 修复 MosDNS 编译错误 ===
-        # 关闭 UPX 压缩 (CI 环境容易失败，且对软路由性能无影响)
         echo "CONFIG_MOSDNS_COMPRESS_UPX=n" >> .config
 
-        # 生成完整配置
         make defconfig
 
     - name: Download Sources
@@ -197,12 +190,7 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        
-        # === 阶段 4: 编译剩余所有固件 ===
-        echo "Building Firmware (Remaining)..."
-        # 此时最难啃的骨头(OpenSSL)和最易碎的骨头(MosDNS)都啃完了，剩下的可以全速跑
         make -j$(nproc) || make -j1 || make -j1 V=s
-        
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Organize Files
@@ -220,11 +208,11 @@ jobs:
       with:
         name: OpenWrt_firmware
         path: ${{ env.FIRMWARE }}
+        
     - name: Generate release tag
       id: tag
       if: steps.organize.outputs.status == 'success' && !cancelled()
       run: |
-        # 生成一个基于时间的标签，例如 v24.10.5-20251221
         echo "release_tag=v24.10.5-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
         echo "OpenWrt v24.10.5 自编译固件" >> release.txt
