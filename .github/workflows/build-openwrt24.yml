@@ -27,15 +27,17 @@ jobs:
     # ✅ 【新增优化】使用专用 Action 深度清理磁盘
     # 这步会替代你原来的 "Initialization Environment" 中的部分清理代码
     # 能释放约 30GB+ 空间，总可用空间将达到 60GB+
-    - name: Maximize Disk Space
-      uses: easimon/maximize-build-space@master
+    - name: Free Disk Space (Ubuntu)
+      uses: jlumbroso/free-disk-space@main
       with:
-        root-reserve-mb: 4096
-        swap-size-mb: 1024
-        remove-dotnet: true
-        remove-android: true
-        remove-haskell: true
-        remove-codeql: true
+        # 删除所有不需要的预装软件
+        tool-cache: true
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true # ⚠ 关键：删除 Swap 分区可释放 7GB
 
     - name: Initialization Environment
       env:
@@ -86,15 +88,6 @@ jobs:
       run: |
         # ✅ 优化：加上 --depth 1 减少 git 历史占用
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
-
-    # === 缓存配置 ===
-    - name: Cache Toolchain
-      if: env.CACHE_TOOLCHAIN == 'true'
-      uses: HiGarfield/cachewrtbuild@main
-      with:
-        ccache: false
-        mixkey: ${{ env.REPO_BRANCH }}-x86_64
-        prefix: ${{ github.workspace }}/openwrt
 
     - name: Update Feeds & Add Custom Sources
       run: |
