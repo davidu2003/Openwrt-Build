@@ -178,10 +178,13 @@ jobs:
         make defconfig
 
     - name: Upload Config File
+      run: cp openwrt/.config openwrt/config.txt  # 先复制一份
+      
+    - name: Upload Config Artifact
       uses: actions/upload-artifact@v4
       with:
         name: OpenWrt_Config_Debug
-        path: openwrt/.config
+        path: openwrt/config.txt  # 上传这个非隐藏文件
     
     - name: Download Sources
       run: |
