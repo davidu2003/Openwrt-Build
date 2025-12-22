@@ -194,9 +194,8 @@ jobs:
         find dl -size -1024c -exec rm -f {} \;
         
     # 源码已经解压到 build_dir 了，dl 文件夹里的压缩包现在是由于的，删掉可以省 3-5GB
-    - name: Clear DL Package
+    - name: Show Space availability
       run: |
-        rm -rf openwrt/dl/*
         # 显示最新的空间情况
         echo "======================="
         echo "Space availability:"
