@@ -136,11 +136,12 @@ jobs:
         echo "CONFIG_TARGET_x86_64_DEVICE_generic=y" >> .config
 
         # --- 核心设置 ---
-        echo "CONFIG_TARGET_ROOTFS_PARTSIZE=10240" >> .config
+        echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
         echo "CONFIG_PACKAGE_blockd=y" >> .config
         echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
         echo "CONFIG_PACKAGE_luci=y" >> .config
         echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
+        echo "CONFIG_LUCI_SRCDIET=n" >> .config
 
         # --- 插件 ---
         echo "CONFIG_PACKAGE_luci-theme-argon=y" >> .config
