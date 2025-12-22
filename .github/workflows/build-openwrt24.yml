@@ -192,7 +192,12 @@ jobs:
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-
+        
+    # 源码已经解压到 build_dir 了，dl 文件夹里的压缩包现在是由于的，删掉可以省 3-5GB
+    - name: Clear DL Package
+      run: |
+        rm -rf openwrt/dl/*
+        
     - name: Compile Firmware
       id: compile
       run: |
