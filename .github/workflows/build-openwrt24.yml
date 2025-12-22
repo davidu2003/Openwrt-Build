@@ -27,18 +27,16 @@ jobs:
     # ✅ 【新增优化】使用专用 Action 深度清理磁盘
     # 这步会替代你原来的 "Initialization Environment" 中的部分清理代码
     # 能释放约 30GB+ 空间，总可用空间将达到 60GB+
-    - name: Free Disk Space (Ubuntu)
-      uses: jlumbroso/free-disk-space@main
+    - name: Maximize Disk Space
+      uses: easimon/maximize-build-space@master
       with:
-        # 删除所有不需要的预装软件
-        tool-cache: true
-        android: true
-        dotnet: true
-        haskell: true
-        large-packages: true
-        docker-images: true
-        swap-storage: true # ⚠ 关键：删除 Swap 分区可释放 7GB
-    
+        root-reserve-mb: 4096
+        swap-size-mb: 1024
+        remove-dotnet: true
+        remove-android: true
+        remove-haskell: true
+        remove-codeql: true
+
     - name: Initialization Environment
       env:
         DEBIAN_FRONTEND: noninteractive
