@@ -124,11 +124,19 @@ jobs:
         if [ -f "feeds/packages/lang/rust/Makefile" ]; then
             sed -i 's|--set=llvm.download-ci-llvm=.*|--set=llvm.download-ci-llvm=false \\|' feeds/packages/lang/rust/Makefile
         fi
-
+    - name: Load Custom Configuration
+      run: |
+        # 1. 如果仓库根目录有 files 文件夹（存放自定义系统文件的），移动进去
+        # 这也是常用技巧，比如你可以放 files/etc/banner 来修改登录欢迎语
+        [ -e files ] && mv files openwrt/files
+        
+        # 2. 如果仓库里有 .config 文件，移动到 openwrt 目录
+        # 注意：这里用 mv 移动，$CONFIG_FILE 是你在 env 里定义的变量
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        
     - name: Generate Config File
       run: |
         cd openwrt
-        rm -f .config
         
         # --- 目标平台 ---
         echo "CONFIG_TARGET_x86=y" >> .config
