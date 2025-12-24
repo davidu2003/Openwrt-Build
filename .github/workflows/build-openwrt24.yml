@@ -15,6 +15,8 @@ env:
   CONFIG_FILE: .config
   CACHE_TOOLCHAIN: true
   TZ: Asia/Shanghai
+  # ✅ 唯一新增的环境变量：定义编译工作区
+  WORK_DIR: /mnt/openwrt
 
 jobs:
   build:
@@ -24,20 +26,16 @@ jobs:
     - name: Checkout
       uses: actions/checkout@main
 
-    # ✅ 【新增优化】使用专用 Action 深度清理磁盘
-    # 这步会替代你原来的 "Initialization Environment" 中的部分清理代码
-    # 能释放约 30GB+ 空间，总可用空间将达到 60GB+
     - name: Free Disk Space (Ubuntu)
       uses: jlumbroso/free-disk-space@main
       with:
-        # 删除所有不需要的预装软件
         tool-cache: true
         android: true
         dotnet: true
         haskell: true
         large-packages: true
         docker-images: true
-        swap-storage: true # ⚠ 关键：删除 Swap 分区可释放 7GB
+        swap-storage: true
 
     - name: Initialization Environment
       env:
@@ -52,26 +50,10 @@ jobs:
         sudo -E apt-get clean
         sudo timedatectl set-timezone "$TZ"
         
-        # 显示清理后的空间情况
         echo "======================="
         echo "Space availability:"
         df -hT
         echo "======================="
-        
-    - name: Prepare /mnt for OpenWrt build
-      run: |
-        sudo mkdir -p /mnt/openwrt
-        sudo chown -R $USER:$USER /mnt/openwrt
-
-        # 如果 workspace 下已有 openwrt（防御性处理）
-        rm -rf $GITHUB_WORKSPACE/openwrt
-
-        # 用软链接把 openwrt 指向 /mnt
-        ln -s /mnt/openwrt $GITHUB_WORKSPACE/openwrt
-
-        echo "OpenWrt workspace linked to /mnt:"
-        ls -ld $GITHUB_WORKSPACE/openwrt
-        df -hT /mnt
 
     - name: Check Server Performance
       run: |
@@ -100,36 +82,43 @@ jobs:
         echo "GOPROXY=https://proxy.golang.org,direct" >> $GITHUB_ENV
         echo "GOPRIVATE=" >> $GITHUB_ENV
 
+    # ✅ 新增步骤：创建 /mnt 下的工作目录
+    - name: Prepare Build Directory
+      run: |
+        sudo mkdir -p ${{ env.WORK_DIR }}
+        sudo chown $USER:$GROUPS ${{ env.WORK_DIR }}
+
     - name: Clone Source Code
       run: |
-        # ✅ 优化：加上 --depth 1 减少 git 历史占用
-        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
-    
+        # ✅ 修改：克隆到指定的工作目录
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH ${{ env.WORK_DIR }}
+   
     - name: Cache Toolchain
       if: env.CACHE_TOOLCHAIN == 'true'
       uses: HiGarfield/cachewrtbuild@main
       with:
         ccache: false
         mixkey: ${{ env.REPO_BRANCH }}-x86_64
-        prefix: /mnt/openwrt
+        prefix: ${{ env.WORK_DIR }}
 
     - name: Update Feeds & Add Custom Sources
       run: |
-        cd openwrt
+        # ✅ 修改：路径变更
+        cd ${{ env.WORK_DIR }}
         
         ./scripts/feeds update -a
         
         echo "Replacing Golang with 25.x branch..."
         rm -rf feeds/packages/lang/golang
-        # ✅ 优化：加上 --depth 1
         git clone https://github.com/sbwml/packages_lang_golang -b 25.x --depth 1 feeds/packages/lang/golang
         
         ./scripts/feeds install -a
 
     - name: Install Custom Packages (DIY Script)
       run: |
-        cd openwrt
-        # ✅ 优化：所有 git clone 都加上 --depth 1
+        # ✅ 修改：路径变更
+        cd ${{ env.WORK_DIR }}
+        
         git clone --depth 1 https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
         git clone --depth 1 https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
         git clone --depth 1 -b dev https://github.com/vernesong/OpenClash.git package/openclash
@@ -141,40 +130,31 @@ jobs:
         git clone --depth 1 https://github.com/pexcn/openwrt-chinadns-ng.git package/chinadns-ng
         git clone --depth 1 https://github.com/immortalwrt/homeproxy.git package/homeproxy
 
-        # --- 修改配置 ---
         sed -i 's/192.168.1.1/10.10.10.1/g' package/base-files/files/bin/config_generate
         sed -i 's/luci.main.mediaurlbase=.*/luci.main.mediaurlbase=\/luci-static\/argon/g' feeds/luci/modules/luci-base/root/etc/config/luci
         if [ -f "feeds/packages/lang/rust/Makefile" ]; then
             sed -i 's|--set=llvm.download-ci-llvm=.*|--set=llvm.download-ci-llvm=false \\|' feeds/packages/lang/rust/Makefile
         fi
+
     - name: Load Custom Configuration
       run: |
-        # 1. 如果仓库根目录有 files 文件夹（存放自定义系统文件的），移动进去
-        # 这也是常用技巧，比如你可以放 files/etc/banner 来修改登录欢迎语
-        [ -e files ] && mv files openwrt/files
-        
-        # 2. 如果仓库里有 .config 文件，移动到 openwrt 目录
-        # 注意：这里用 mv 移动，$CONFIG_FILE 是你在 env 里定义的变量
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        # ✅ 修改：路径变更
+        [ -e files ] && mv files ${{ env.WORK_DIR }}/files
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE ${{ env.WORK_DIR }}/.config
         
     - name: Generate Config File
       run: |
-        cd openwrt
+        # ✅ 修改：路径变更
+        cd ${{ env.WORK_DIR }}
         
-        # --- 目标平台 ---
         echo "CONFIG_TARGET_x86=y" >> .config
         echo "CONFIG_TARGET_x86_64=y" >> .config
         echo "CONFIG_TARGET_x86_64_DEVICE_generic=y" >> .config
-
-        # --- 核心设置 ---
         echo "CONFIG_TARGET_ROOTFS_PARTSIZE=3072" >> .config
         echo "CONFIG_PACKAGE_blockd=y" >> .config
         echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
         echo "CONFIG_PACKAGE_luci=y" >> .config
         echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
-        # echo "CONFIG_LUCI_SRCDIET=n" >> .config
-
-        # --- 插件 ---
         echo "CONFIG_PACKAGE_luci-theme-argon=y" >> .config
         echo "CONFIG_PACKAGE_luci-app-argon-config=y" >> .config
         echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
@@ -183,16 +163,12 @@ jobs:
         echo "CONFIG_PACKAGE_luci-app-statistics=y" >> .config
         echo "CONFIG_PACKAGE_chinadns-ng=y" >> .config
         echo "CONFIG_PACKAGE_homeproxy=y" >> .config
-
-        # --- 工具 ---
         echo "CONFIG_PACKAGE_tcpdump=y" >> .config
         echo "CONFIG_PACKAGE_vim-full=y" >> .config
         echo "CONFIG_PACKAGE_bash=y" >> .config
         echo "CONFIG_PACKAGE_zsh=y" >> .config
         echo "CONFIG_PACKAGE_fdisk=y" >> .config
         echo "CONFIG_PACKAGE_resize2fs=y" >> .config
-        
-        # --- Collectd ---
         echo "CONFIG_PACKAGE_collectd=y" >> .config
         echo "CONFIG_PACKAGE_collectd-mod-cpu=y" >> .config
         echo "CONFIG_PACKAGE_collectd-mod-cpufreq=y" >> .config
@@ -201,8 +177,6 @@ jobs:
         echo "CONFIG_PACKAGE_collectd-mod-memory=y" >> .config
         echo "CONFIG_PACKAGE_collectd-mod-network=y" >> .config
         echo "CONFIG_PACKAGE_collectd-mod-sensors=y" >> .config
-
-        # --- Kernel ---
         echo "CONFIG_NET_SCH_FQ=y" >> .config
         echo "CONFIG_kmod-tcp-bbr=y" >> .config
         echo "CONFIG_kmod-sched-fq=y" >> .config
@@ -211,25 +185,26 @@ jobs:
         make defconfig
 
     - name: Upload Config File
-      run: cp openwrt/.config openwrt/config.txt  # 先复制一份
-      
+      run: |
+        # ✅ 修改：路径变更
+        cp ${{ env.WORK_DIR }}/.config config.txt
+
     - name: Upload Config Artifact
       uses: actions/upload-artifact@v4
       with:
         name: OpenWrt_Config_Debug
-        path: openwrt/config.txt  # 上传这个非隐藏文件
+        path: config.txt
     
     - name: Download Sources
       run: |
-        cd openwrt
+        # ✅ 修改：路径变更
+        cd ${{ env.WORK_DIR }}
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
         
-    # 源码已经解压到 build_dir 了，dl 文件夹里的压缩包现在是由于的，删掉可以省 3-5GB
     - name: Show Space availability
       run: |
-        # 显示最新的空间情况
         echo "======================="
         echo "Space availability:"
         df -hT
@@ -238,10 +213,10 @@ jobs:
     - name: Compile Firmware
       id: compile
       run: |
-        cd openwrt
+        # ✅ 修改：路径变更
+        cd ${{ env.WORK_DIR }}
         echo -e "$(nproc) thread compile"
         
-        # 尝试多线程编译
         make -j$(nproc) || {
           echo "多线程编译失败，尝试单线程输出错误信息..."
           make -j1 V=s
@@ -253,7 +228,8 @@ jobs:
       id: organize
       if: steps.compile.outputs.status == 'success'
       run: |
-        cd openwrt/bin/targets/*/*
+        # ✅ 修改：路径变更
+        cd ${{ env.WORK_DIR }}/bin/targets/*/*
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
