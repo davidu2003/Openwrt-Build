@@ -90,16 +90,6 @@ jobs:
         # ✅ 优化：加上 --depth 1 减少 git 历史占用
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
 
-    # === 缓存配置 ===
-    - name: Cache Toolchain
-      if: env.CACHE_TOOLCHAIN == 'true'
-      uses: HiGarfield/cachewrtbuild@main
-      with:
-        ccache: false
-        mixkey: ${{ env.REPO_BRANCH }}-x86_64
-        # 注意：这里 prefix 改为当前目录下的 openwrt
-        prefix: ${{ github.workspace }}/openwrt
-
     - name: Update Feeds & Add Custom Sources
       run: |
         cd openwrt
