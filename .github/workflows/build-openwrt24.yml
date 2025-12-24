@@ -199,7 +199,7 @@ jobs:
       run: |
         # ✅ 修改：路径变更
         cd ${{ env.WORK_DIR }}
-        make download -j8
+        make download -j$(nproc)
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
         
