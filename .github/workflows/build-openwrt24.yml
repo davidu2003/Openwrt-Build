@@ -57,6 +57,21 @@ jobs:
         echo "Space availability:"
         df -hT
         echo "======================="
+        
+    - name: Prepare /mnt for OpenWrt build
+      run: |
+        sudo mkdir -p /mnt/openwrt
+        sudo chown -R $USER:$USER /mnt/openwrt
+
+        # 如果 workspace 下已有 openwrt（防御性处理）
+        rm -rf $GITHUB_WORKSPACE/openwrt
+
+        # 用软链接把 openwrt 指向 /mnt
+        ln -s /mnt/openwrt $GITHUB_WORKSPACE/openwrt
+
+        echo "OpenWrt workspace linked to /mnt:"
+        ls -ld $GITHUB_WORKSPACE/openwrt
+        df -hT /mnt
 
     - name: Check Server Performance
       run: |
@@ -89,6 +104,14 @@ jobs:
       run: |
         # ✅ 优化：加上 --depth 1 减少 git 历史占用
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+    
+    - name: Cache Toolchain
+      if: env.CACHE_TOOLCHAIN == 'true'
+      uses: HiGarfield/cachewrtbuild@main
+      with:
+        ccache: false
+        mixkey: ${{ env.REPO_BRANCH }}-x86_64
+        prefix: /mnt/openwrt
 
     - name: Update Feeds & Add Custom Sources
       run: |
