@@ -105,7 +105,7 @@ jobs:
       run: |
         # ✅ 修改：路径变更
         cd ${{ env.WORK_DIR }}
-        
+        echo "src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main" >> "feeds.conf.default"
         ./scripts/feeds update -a
         
         echo "Replacing Golang with 25.x branch..."
