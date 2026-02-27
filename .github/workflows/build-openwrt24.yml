@@ -163,6 +163,7 @@ jobs:
         echo "CONFIG_PACKAGE_luci-app-upnp=y" >> .config
         echo "CONFIG_PACKAGE_luci-app-httping=y" >> .config
         echo "CONFIG_PACKAGE_luci-app-nikki=y" >> .config
+        echo "CONFIG_PACKAGE_luci-i18n-nikki-zh-cn=y" >> .config
         echo "CONFIG_PACKAGE_luci-app-statistics=y" >> .config
         echo "CONFIG_PACKAGE_chinadns-ng=y" >> .config
         echo "CONFIG_PACKAGE_homeproxy=y" >> .config
