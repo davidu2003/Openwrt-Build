@@ -165,6 +165,7 @@ jobs:
         echo "CONFIG_PACKAGE_luci-app-nikki=y" >> .config
         echo "CONFIG_PACKAGE_luci-i18n-nikki-zh-cn=y" >> .config
         echo "CONFIG_PACKAGE_luci-app-statistics=y" >> .config
+        echo "CONFIG_PACKAGE_luci-ssl-openssl=y" >> .config
         echo "CONFIG_PACKAGE_chinadns-ng=y" >> .config
         echo "CONFIG_PACKAGE_homeproxy=y" >> .config
         echo "CONFIG_PACKAGE_tcpdump=y" >> .config
