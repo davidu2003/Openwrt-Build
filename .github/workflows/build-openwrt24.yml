@@ -184,6 +184,9 @@ jobs:
         echo "CONFIG_PACKAGE_collectd-mod-memory=y" >> .config
         echo "CONFIG_PACKAGE_collectd-mod-network=y" >> .config
         echo "CONFIG_PACKAGE_collectd-mod-sensors=y" >> .config
+        echo "CONFIG_PACKAGE_collectd-mod-df=y" >> .config
+        echo "CONFIG_PACKAGE_collectd-mod-disk=y" >> .config
+        echo "CONFIG_PACKAGE_collectd-mod-dns=y" >> .config
         echo "CONFIG_NET_SCH_FQ=y" >> .config
         echo "CONFIG_kmod-tcp-bbr=y" >> .config
         echo "CONFIG_kmod-sched-fq=y" >> .config
