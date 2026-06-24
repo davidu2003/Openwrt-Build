@@ -1,4 +1,4 @@
-name: Build OpenWrt 24.10
+name: Build OpenWrt 25.12
 
 on:
   workflow_dispatch:
@@ -256,9 +256,9 @@ jobs:
       id: tag
       if: steps.organize.outputs.status == 'success' && !cancelled()
       run: |
-        echo "release_tag=v24.10.5-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        echo "release_tag=v25.12.4-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
-        echo "OpenWrt v24.10.5 自编译固件" >> release.txt
+        echo "OpenWrt v25.12.4 自编译固件" >> release.txt
         echo "编译时间: $(date)" >> release.txt
 
     - name: Upload Firmware to Release
