@@ -240,13 +240,14 @@ jobs:
         echo -e "$(nproc) thread compile"
 
         set +e
-        make -j$(nproc) > build-parallel.log 2>&1
-        BUILD_STATUS=$?
+        # 实时显示每个组件的编译输出，同时保留完整日志供失败时下载。
+        make -j$(nproc) 2>&1 | tee build-parallel.log
+        BUILD_STATUS=${PIPESTATUS[0]}
 
         if [ "$BUILD_STATUS" -ne 0 ]; then
           echo "多线程编译失败，尝试单线程输出错误信息..."
-          make -j1 V=s > build-verbose.log 2>&1
-          BUILD_STATUS=$?
+          make -j1 V=s 2>&1 | tee build-verbose.log
+          BUILD_STATUS=${PIPESTATUS[0]}
         fi
 
         if [ "$BUILD_STATUS" -ne 0 ]; then
