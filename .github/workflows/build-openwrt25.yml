@@ -14,6 +14,9 @@ env:
   FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: .config
   CACHE_TOOLCHAIN: true
+  GOLANG_REPO: https://github.com/sbwml/packages_lang_golang.git
+  GOLANG_COMMIT: 1a79ae5f43559604e0d4001cf962f0fed9ec7126
+  GOLANG_SOURCE_SHA256: f90dcee4bd023fa376374ea0a5a6ebe553537b39c426ffd8c689469b45519932
   TZ: Asia/Shanghai
   # ✅ 唯一新增的环境变量：定义编译工作区
   WORK_DIR: /mnt/openwrt
@@ -73,9 +76,9 @@ jobs:
     - name: Setup Go Environment
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25' 
-        check-latest: true
-        cache: true
+        go-version: '1.25.12'
+        check-latest: false
+        cache: false
     
     - name: Set Go Proxy
       run: |
@@ -108,9 +111,16 @@ jobs:
         echo "src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main" >> "feeds.conf.default"
         ./scripts/feeds update -a
         
-        echo "Replacing Golang with 25.x branch..."
+        echo "Replacing Golang with pinned 1.25.12 source..."
         rm -rf feeds/packages/lang/golang
-        git clone https://github.com/sbwml/packages_lang_golang -b 25.x --depth 1 feeds/packages/lang/golang
+        git clone --filter=blob:none --no-checkout --branch 25.x "$GOLANG_REPO" feeds/packages/lang/golang
+        git -C feeds/packages/lang/golang checkout --detach "$GOLANG_COMMIT"
+
+        GOLANG_MAKEFILE=feeds/packages/lang/golang/golang/Makefile
+        sed -i "s/^PKG_HASH:=.*/PKG_HASH:=${GOLANG_SOURCE_SHA256}/" "$GOLANG_MAKEFILE"
+        grep -Fqx 'GO_VERSION_MAJOR_MINOR:=1.25' "$GOLANG_MAKEFILE"
+        grep -Fqx 'GO_VERSION_PATCH:=12' "$GOLANG_MAKEFILE"
+        grep -Fqx "PKG_HASH:=${GOLANG_SOURCE_SHA256}" "$GOLANG_MAKEFILE"
         
         ./scripts/feeds install -a
 
@@ -211,6 +221,7 @@ jobs:
         # ✅ 修改：路径变更
         cd ${{ env.WORK_DIR }}
         make download -j$(nproc)
+        make package/feeds/packages/golang/download V=s
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
         
@@ -227,13 +238,40 @@ jobs:
         # ✅ 修改：路径变更
         cd ${{ env.WORK_DIR }}
         echo -e "$(nproc) thread compile"
-        
-        make -j$(nproc) || {
+
+        set +e
+        make -j$(nproc) > build-parallel.log 2>&1
+        BUILD_STATUS=$?
+
+        if [ "$BUILD_STATUS" -ne 0 ]; then
           echo "多线程编译失败，尝试单线程输出错误信息..."
-          make -j1 V=s
-        }
-        
+          make -j1 V=s > build-verbose.log 2>&1
+          BUILD_STATUS=$?
+        fi
+
+        if [ "$BUILD_STATUS" -ne 0 ]; then
+          echo "================ Relevant errors ================"
+          grep -nE '(^|[[:space:]])(ERROR:|error:|fatal:|Killed|No space left|Hash of the downloaded file does not match|No more mirrors to try|undefined reference)|make(\[[0-9]+\])?: \*\*\*' build-verbose.log | tail -n 200 || true
+          echo "================ Last 200 log lines ================"
+          tail -n 200 build-verbose.log || true
+          df -hT || true
+          free -h || true
+          exit "$BUILD_STATUS"
+        fi
+
+        set -e
         echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload Compile Logs
+      if: failure() && steps.compile.outcome == 'failure'
+      uses: actions/upload-artifact@v4
+      with:
+        name: OpenWrt_compile_logs
+        path: |
+          ${{ env.WORK_DIR }}/build-parallel.log
+          ${{ env.WORK_DIR }}/build-verbose.log
+        if-no-files-found: ignore
+        retention-days: 7
 
     - name: Organize Files
       id: organize
@@ -256,9 +294,9 @@ jobs:
       id: tag
       if: steps.organize.outputs.status == 'success' && !cancelled()
       run: |
-        echo "release_tag=v25.12.4-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        echo "release_tag=v25.12.5-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
-        echo "OpenWrt v25.12.4 自编译固件" >> release.txt
+        echo "OpenWrt v25.12.5 自编译固件" >> release.txt
         echo "编译时间: $(date)" >> release.txt
 
     - name: Upload Firmware to Release
