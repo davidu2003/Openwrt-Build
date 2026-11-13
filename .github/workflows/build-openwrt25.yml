@@ -15,8 +15,8 @@ env:
   CONFIG_FILE: .config
   CACHE_TOOLCHAIN: true
   GOLANG_REPO: https://github.com/sbwml/packages_lang_golang.git
-  GOLANG_COMMIT: 1a79ae5f43559604e0d4001cf962f0fed9ec7126
-  GOLANG_SOURCE_SHA256: f90dcee4bd023fa376374ea0a5a6ebe553537b39c426ffd8c689469b45519932
+  GOLANG_COMMIT: fc880a4b58498e6a39e8917c923ff8455723cbc3
+  GOLANG_SOURCE_SHA256: d44101b0ff27ed2a4c75ad46c17b9c74359209e2eb2ca7c9df6cb4fdb68e1969
   TZ: Asia/Shanghai
   # ✅ 唯一新增的环境变量：定义编译工作区
   WORK_DIR: /mnt/openwrt
@@ -76,7 +76,7 @@ jobs:
     - name: Setup Go Environment
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25.12'
+        go-version: '1.26.11'
         check-latest: false
         cache: false
     
@@ -101,7 +101,7 @@ jobs:
       uses: HiGarfield/cachewrtbuild@main
       with:
         ccache: false
-        mixkey: ${{ env.REPO_BRANCH }}-x86_64
+        mixkey: ${{ env.REPO_BRANCH }}-x86_64-go1.26.11
         prefix: ${{ env.WORK_DIR }}
 
     - name: Update Feeds & Add Custom Sources
@@ -111,15 +111,15 @@ jobs:
         echo "src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main" >> "feeds.conf.default"
         ./scripts/feeds update -a
         
-        echo "Replacing Golang with pinned 1.25.12 source..."
+        echo "Replacing Golang with pinned 1.26.11 source..."
         rm -rf feeds/packages/lang/golang
-        git clone --filter=blob:none --no-checkout --branch 25.x "$GOLANG_REPO" feeds/packages/lang/golang
+        git clone --filter=blob:none --no-checkout --branch 26.x "$GOLANG_REPO" feeds/packages/lang/golang
         git -C feeds/packages/lang/golang checkout --detach "$GOLANG_COMMIT"
 
         GOLANG_MAKEFILE=feeds/packages/lang/golang/golang/Makefile
         sed -i "s/^PKG_HASH:=.*/PKG_HASH:=${GOLANG_SOURCE_SHA256}/" "$GOLANG_MAKEFILE"
-        grep -Fqx 'GO_VERSION_MAJOR_MINOR:=1.25' "$GOLANG_MAKEFILE"
-        grep -Fqx 'GO_VERSION_PATCH:=12' "$GOLANG_MAKEFILE"
+        grep -Fqx 'GO_VERSION_MAJOR_MINOR:=1.26' "$GOLANG_MAKEFILE"
+        grep -Fqx 'GO_VERSION_PATCH:=11' "$GOLANG_MAKEFILE"
         grep -Fqx "PKG_HASH:=${GOLANG_SOURCE_SHA256}" "$GOLANG_MAKEFILE"
         
         ./scripts/feeds install -a
